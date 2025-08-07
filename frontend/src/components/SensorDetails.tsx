@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import sensorDataManager from '../data/sensorData.js';
 import { Activity, Thermometer, Zap, Volume2, ArrowLeft } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface SensorData {
     id: number;
@@ -26,6 +26,29 @@ interface Component {
     status: string;
     machine_id: number;
 }
+
+// Custom dark tooltip for charts
+const CustomTooltip = (props: any) => {
+    const { active, payload, label, color } = props;
+    if (active && payload && payload.length) {
+        return (
+            <div style={{
+                background: '#23272f',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                color: color,
+                border: `1px solid ${color}`,
+                fontWeight: 600,
+                fontSize: 14,
+                boxShadow: '0 2px 8px #0002'
+            }}>
+                <div style={{ marginBottom: 4 }}>{label ?? ''}</div>
+                <div>{Number(payload?.[0]?.value).toFixed(1)}</div>
+            </div>
+        );
+    }
+    return null;
+};
 
 const SensorDetails: React.FC = () => {
     const { componentId } = useParams<{ componentId: string }>();
@@ -175,149 +198,209 @@ const SensorDetails: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-900 text-white p-6">
             {/* Header */}
-            <div className="flex items-center space-x-4 mb-8">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center text-gray-400 hover:text-blue-600 transition-colors"
-                >
-                    <ArrowLeft className="w-5 h-5 mr-2" />
-                    Back
-                </button>
-                <h1 className="text-3xl font-bold text-blue-400">
-                    {component?.name} - Sensor Overview
-                </h1>
-                <div className={`px-3 py-1 rounded-full text-sm font-medium ml-auto ${component?.status === 'critical' ? 'bg-red-900/30 text-red-400' :
-                    component?.status === 'warning' ? 'bg-orange-900/30 text-orange-400' :
-                        'bg-green-900/30 text-green-400'
-                    }`}>
+            <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center space-x-8">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center text-gray-400 hover:text-blue-400 transition-colors duration-200 text-lg font-medium"
+                    >
+                        <ArrowLeft className="w-5 h-5 mr-2" />
+                        Back
+                    </button>
+                    <div className="flex flex-col">
+                        <div className="flex items-baseline space-x-3">
+                            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-300 to-cyan-300 tracking-tight">
+                                {component?.name}
+                            </h1>
+                            <span className="text-lg font-medium text-gray-400 px-3 py-1 bg-gray-800 rounded-full">
+                                Sensor Overview
+                            </span>
+                        </div>
+                        <div className="flex items-center mt-2 space-x-4">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                <span className="text-sm text-gray-400 font-medium">Real-time Monitoring</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <span className="text-sm text-gray-400 font-medium">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className={`px-6 py-3 rounded-xl text-lg font-bold tracking-wide shadow-lg border ${component?.status === 'critical' ? 'bg-red-900/40 text-red-300 border-red-500/30' : component?.status === 'warning' ? 'bg-orange-900/40 text-orange-300 border-orange-500/30' : 'bg-green-900/40 text-green-300 border-green-500/30'}`}>
                     {component?.status?.toUpperCase()}
                 </div>
             </div>
 
-            <div className="space-y-6 max-w-2xl mx-auto">
-                {/* Temperature Card */}
-                <div className="bg-orange-50 rounded-xl p-6 border border-orange-100 mb-8">
-                    <div className="flex items-center mb-2">
-                        <Thermometer className="w-6 h-6 text-orange-400 mr-2" />
-                        <span className="font-semibold text-orange-700">Temperature</span>
-                    </div>
-                    <div className="flex justify-between items-center mb-1">
-                        <div>
-                            <div className="text-xs text-gray-500">Current Reading</div>
-                            <div className="text-2xl font-bold text-orange-500">{Number(sensorData?.temperature).toFixed(0)}°C</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Side - Component Info and Threshold Values */}
+                <div className="space-y-6">
+                    {/* Component Information */}
+                    <div className="bg-gray-800 rounded-lg p-6">
+                        <h2 className="text-xl font-semibold mb-4 text-blue-400">Component Information</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <div className="text-sm text-gray-400">Component Name</div>
+                                <div className="text-lg font-semibold">{component?.name}</div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-gray-400">Status</div>
+                                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${component?.status === 'critical' ? 'bg-red-900/30 text-red-400' : component?.status === 'warning' ? 'bg-orange-900/30 text-orange-400' : 'bg-green-900/30 text-green-400'}`}>{component?.status?.toUpperCase()}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-xs text-gray-500">Maximum Range</div>
-                            <div className="text-xl font-bold text-orange-700">{Number(sensorLimits.temperature_max).toFixed(0)}°C</div>
-                        </div>
                     </div>
-                    <div className="w-full bg-orange-100 rounded-full h-2 mt-2 mb-4">
-                        <div
-                            className="h-2 rounded-full bg-orange-400"
-                            style={{ width: `${Math.min(Number(sensorData?.temperature) / Number(sensorLimits.temperature_max) * 100, 100)}%` }}
-                        ></div>
-                    </div>
-                    {/* Temperature Graph */}
-                    <div className="bg-white rounded-lg p-4">
-                        <div className="h-40">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={temperatureData.slice(-10)}>
-                                    <defs>
-                                        <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#f97316" stopOpacity={0.1} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                                    <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
-                                    <Tooltip formatter={(value: number) => value.toFixed(0)} />
-                                    <Area type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} fill="url(#tempGradient)" fillOpacity={0.8} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+
+                    {/* Sensor Data - Merged Threshold Values and Current Readings */}
+                    <div className="bg-gray-800 rounded-lg p-6 flex-1">
+                        <h2 className="text-xl font-semibold mb-6 text-blue-400">Sensor Data</h2>
+                        <div className="space-y-6">
+                            {/* Temperature */}
+                            <div className="bg-gray-900 rounded-lg p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center space-x-3">
+                                        <Thermometer className="w-8 h-8 text-orange-400" />
+                                        <div>
+                                            <div className="text-lg font-bold text-orange-300">{Number(sensorData?.temperature).toFixed(0)}°C</div>
+                                            <div className="text-sm text-gray-400">Current Temperature</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm text-gray-400">Max Threshold</div>
+                                        <div className="text-lg font-bold text-orange-400">{Number(sensorLimits.temperature_max).toFixed(0)}°C</div>
+                                    </div>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-4">
+                                    <div className="h-4 rounded-full bg-orange-400 transition-all duration-500" style={{ width: `${Math.min(Number(sensorData?.temperature) / Number(sensorLimits.temperature_max) * 100, 100)}%` }}></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mt-2">
+                                    <span>0°C</span>
+                                    <span>{Number(sensorLimits.temperature_max).toFixed(0)}°C</span>
+                                </div>
+                            </div>
+
+                            {/* Vibration */}
+                            <div className="bg-gray-900 rounded-lg p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center space-x-3">
+                                        <Zap className="w-8 h-8 text-blue-400" />
+                                        <div>
+                                            <div className="text-lg font-bold text-blue-300">{Number(sensorData?.vibration).toFixed(0)}mm/s</div>
+                                            <div className="text-sm text-gray-400">Current Vibration</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm text-gray-400">Max Threshold</div>
+                                        <div className="text-lg font-bold text-blue-400">{Number(sensorLimits.vibration_max).toFixed(0)}mm/s</div>
+                                    </div>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-4">
+                                    <div className="h-4 rounded-full bg-blue-400 transition-all duration-500" style={{ width: `${Math.min(Number(sensorData?.vibration) / Number(sensorLimits.vibration_max) * 100, 100)}%` }}></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mt-2">
+                                    <span>0mm/s</span>
+                                    <span>{Number(sensorLimits.vibration_max).toFixed(0)}mm/s</span>
+                                </div>
+                            </div>
+
+                            {/* Noise Level */}
+                            <div className="bg-gray-900 rounded-lg p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center space-x-3">
+                                        <Volume2 className="w-8 h-8 text-purple-400" />
+                                        <div>
+                                            <div className="text-lg font-bold text-purple-300">{Number(sensorData?.noise).toFixed(0)}dB</div>
+                                            <div className="text-sm text-gray-400">Current Noise Level</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm text-gray-400">Max Threshold</div>
+                                        <div className="text-lg font-bold text-purple-400">{Number(sensorLimits.noise_max).toFixed(0)}dB</div>
+                                    </div>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-4">
+                                    <div className="h-4 rounded-full bg-purple-400 transition-all duration-500" style={{ width: `${Math.min(Number(sensorData?.noise) / Number(sensorLimits.noise_max) * 100, 100)}%` }}></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mt-2">
+                                    <span>0dB</span>
+                                    <span>{Number(sensorLimits.noise_max).toFixed(0)}dB</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                {/* Vibration Card */}
-                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100 mb-8">
-                    <div className="flex items-center mb-2">
-                        <Zap className="w-6 h-6 text-blue-400 mr-2" />
-                        <span className="font-semibold text-blue-700">Vibration</span>
-                    </div>
-                    <div className="flex justify-between items-center mb-1">
-                        <div>
-                            <div className="text-xs text-gray-500">Current Reading</div>
-                            <div className="text-2xl font-bold text-blue-500">{Number(sensorData?.vibration).toFixed(0)}mm/s</div>
+
+                {/* Right Side - Charts */}
+                <div className="space-y-8 flex flex-col justify-between h-full">
+                    {/* Temperature Chart */}
+                    <div className="bg-gray-800 rounded-lg p-4 h-56 flex flex-col">
+                        <div className="flex items-center mb-3">
+                            <Thermometer className="w-5 h-5 text-orange-400 mr-2" />
+                            <span className="font-semibold text-orange-400">Temperature Trend</span>
                         </div>
-                        <div>
-                            <div className="text-xs text-gray-500">Maximum Range</div>
-                            <div className="text-xl font-bold text-blue-700">{Number(sensorLimits.vibration_max).toFixed(0)}mm/s</div>
-                        </div>
-                    </div>
-                    <div className="w-full bg-blue-100 rounded-full h-2 mt-2 mb-4">
-                        <div
-                            className="h-2 rounded-full bg-blue-400"
-                            style={{ width: `${Math.min(Number(sensorData?.vibration) / Number(sensorLimits.vibration_max) * 100, 100)}%` }}
-                        ></div>
-                    </div>
-                    {/* Vibration Graph */}
-                    <div className="bg-white rounded-lg p-4">
-                        <div className="h-40">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={vibrationData.slice(-10)}>
-                                    <defs>
-                                        <linearGradient id="vibGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                                    <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
-                                    <Tooltip formatter={(value: number) => value.toFixed(0)} />
-                                    <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#vibGradient)" fillOpacity={0.8} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                        <div className="flex-1">
+                            {temperatureData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={temperatureData.slice(-10)}>
+                                        <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                                        <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
+                                        <Tooltip content={<CustomTooltip color="#f97316" />} />
+                                        <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    Loading temperature data...
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-                {/* Noise Card */}
-                <div className="bg-purple-50 rounded-xl p-6 border border-purple-100 mb-8">
-                    <div className="flex items-center mb-2">
-                        <Volume2 className="w-6 h-6 text-purple-400 mr-2" />
-                        <span className="font-semibold text-purple-700">Noise Level</span>
-                    </div>
-                    <div className="flex justify-between items-center mb-1">
-                        <div>
-                            <div className="text-xs text-gray-500">Current Reading</div>
-                            <div className="text-2xl font-bold text-purple-500">{Number(sensorData?.noise).toFixed(0)}dB</div>
+
+                    {/* Vibration Chart */}
+                    <div className="bg-gray-800 rounded-lg p-4 h-56 flex flex-col">
+                        <div className="flex items-center mb-3">
+                            <Zap className="w-5 h-5 text-blue-400 mr-2" />
+                            <span className="font-semibold text-blue-400">Vibration Trend</span>
                         </div>
-                        <div>
-                            <div className="text-xs text-gray-500">Maximum Range</div>
-                            <div className="text-xl font-bold text-purple-700">{Number(sensorLimits.noise_max).toFixed(0)}dB</div>
+                        <div className="flex-1">
+                            {vibrationData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={vibrationData.slice(-10)}>
+                                        <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                                        <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
+                                        <Tooltip content={<CustomTooltip color="#3b82f6" />} />
+                                        <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    Loading vibration data...
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="w-full bg-purple-100 rounded-full h-2 mt-2 mb-4">
-                        <div
-                            className="h-2 rounded-full bg-purple-400"
-                            style={{ width: `${Math.min(Number(sensorData?.noise) / Number(sensorLimits.noise_max) * 100, 100)}%` }}
-                        ></div>
-                    </div>
-                    {/* Noise Graph */}
-                    <div className="bg-white rounded-lg p-4">
-                        <div className="h-40">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={noiseData.slice(-10)}>
-                                    <defs>
-                                        <linearGradient id="noiseGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0.1} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                                    <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
-                                    <Tooltip formatter={(value: number) => value.toFixed(0)} />
-                                    <Area type="monotone" dataKey="value" stroke="#a855f7" strokeWidth={2} fill="url(#noiseGradient)" fillOpacity={0.8} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+
+                    {/* Noise Chart */}
+                    <div className="bg-gray-800 rounded-lg p-4 h-56 flex flex-col">
+                        <div className="flex items-center mb-3">
+                            <Volume2 className="w-5 h-5 text-purple-400 mr-2" />
+                            <span className="font-semibold text-purple-400">Noise Level Trend</span>
+                        </div>
+                        <div className="flex-1">
+                            {noiseData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={noiseData.slice(-10)}>
+                                        <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                                        <YAxis stroke="#9CA3AF" fontSize={10} tick={{ fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={(value: number) => value.toFixed(0)} />
+                                        <Tooltip content={<CustomTooltip color="#a855f7" />} />
+                                        <Line type="monotone" dataKey="value" stroke="#a855f7" strokeWidth={2} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    Loading noise data...
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

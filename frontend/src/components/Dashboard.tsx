@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Filter, Download, User } from 'lucide-react';
+import { Bell, Filter, Download, User, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import MachineList from './MachineList';
 import AddMachine from './AddMachine';
 import { apiService } from '../services/api';
@@ -20,10 +21,18 @@ interface Machine {
   components: Component[];
 }
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onLogout: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [stats, setStats] = useState({ active: 0, good: 0, warning: 0, critical: 0 });
   const [showAddMachine, setShowAddMachine] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userPhoto, setUserPhoto] = useState('');
+  const navigate = useNavigate();
 
   const calculateStats = (machines: Machine[]) => {
     let good = 0, warning = 0, critical = 0;
@@ -61,27 +70,70 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchMachines();
+    const storedName = localStorage.getItem('userName');
+    const storedPhoto = localStorage.getItem('userPhoto');
+    if (storedName) {
+      setUserName(storedName);
+    }
+    if (storedPhoto) {
+      setUserPhoto(storedPhoto);
+    }
   }, []);
 
   const handleDataChanged = () => {
-    fetchMachines(); // Refresh stats and machines after any change
+    fetchMachines();
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <nav className="bg-gray-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-blue-400">SmartMonitor</h1>
-        <div className="flex items-center space-x-4">
+
+        <div className="flex items-center space-x-4 relative">
           <div className="relative">
             <Bell className="w-6 h-6" />
             <span className="absolute -top-2 -right-2 bg-red-500 text-xs w-5 h-5 rounded-full flex items-center justify-center">3</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5" />
+          <div
+            className="flex items-center space-x-2 cursor-pointer hover:text-blue-400"
+            onClick={() => setShowDropdown(!showDropdown)}
+          >
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+              {userPhoto ? (
+                <img src={userPhoto} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-5 h-5" />
+              )}
             </div>
-            <span>John Doe</span>
+            <span>{userName || 'User'}</span>
           </div>
+
+          {showDropdown && (
+            <div className="absolute top-12 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-lg w-48 z-50">
+              <button
+                className="w-full px-4 py-2 text-left hover:bg-gray-700"
+                onClick={() => {
+                  setShowDropdown(false);
+                  navigate('/profile');
+                }}
+              >
+                Profile
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-red-400 hover:bg-gray-700 flex items-center"
+                onClick={() => {
+                  setShowDropdown(false);
+                  localStorage.removeItem('userName');
+                  localStorage.removeItem('userEmail');
+                  localStorage.removeItem('userPhone');
+                  localStorage.removeItem('userPhoto');
+                  onLogout();
+                }}
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Logout
+              </button>
+            </div>
+          )}
         </div>
       </nav>
 

@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2');
 const bodyParser = require('body-parser');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = 5000;
@@ -19,13 +21,144 @@ const db = mysql.createConnection({
   database: 'smart_maintenance',
 });
 
-db.connect((err) => {
-  if (err) {
-    console.error('Database connection failed:', err);
-    return;
-  }
-  console.log('✅ Connected to MySQL database');
-});
+// Database initialization function
+const initializeDatabase = async () => {
+  return new Promise((resolve, reject) => {
+    // First, create database if it doesn't exist
+    const createDbQuery = 'CREATE DATABASE IF NOT EXISTS smart_maintenance';
+
+    // Create a connection without specifying database
+    const tempDb = mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: 'root',
+    });
+
+    tempDb.query(createDbQuery, (err) => {
+      if (err) {
+        console.error('Error creating database:', err);
+        reject(err);
+        return;
+      }
+
+      console.log('✅ Database created/verified');
+      tempDb.end();
+
+      // Now connect to the database and create tables
+      db.connect((err) => {
+        if (err) {
+          console.error('Database connection failed:', err);
+          reject(err);
+          return;
+        }
+        console.log('✅ Connected to MySQL database');
+
+        // Create tables if they don't exist
+        const createTablesQueries = [
+          // Create machines table first (others depend on it)
+          `CREATE TABLE IF NOT EXISTS machines (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          )`,
+
+          // Create components table
+          `CREATE TABLE IF NOT EXISTS components (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            status ENUM('good', 'warning', 'critical') DEFAULT 'good',
+            last_maintenance DATE,
+            next_maintenance DATE,
+            machine_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE
+          )`,
+
+          // Create sensor_data table
+          `CREATE TABLE IF NOT EXISTS sensor_data (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            component_id INT NOT NULL,
+            temperature FLOAT,
+            vibration FLOAT,
+            noise FLOAT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+          )`,
+
+          // Create sensor_limits table
+          `CREATE TABLE IF NOT EXISTS sensor_limits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            component_id INT NOT NULL,
+            temperature_max DECIMAL(5,2) DEFAULT 80.00,
+            vibration_max DECIMAL(5,2) DEFAULT 5.00,
+            noise_max DECIMAL(5,2) DEFAULT 85.00,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+          )`,
+
+          // Create alerts table
+          `CREATE TABLE IF NOT EXISTS alerts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            component_id INT NOT NULL,
+            alert_type VARCHAR(50),
+            message TEXT,
+            level VARCHAR(20),
+            sensor_value FLOAT,
+            threshold_value FLOAT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+          )`,
+
+          // Create notification_recipients table
+          `CREATE TABLE IF NOT EXISTS notification_recipients (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255),
+            email VARCHAR(255),
+            chat_id VARCHAR(50),
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          )`
+        ];
+
+        // Execute all table creation queries
+        let completed = 0;
+        const totalQueries = createTablesQueries.length;
+
+        createTablesQueries.forEach((query, index) => {
+          db.query(query, (err) => {
+            if (err) {
+              console.error(`Error creating table ${index + 1}:`, err);
+              reject(err);
+              return;
+            }
+
+            completed++;
+            console.log(`✅ Table ${index + 1} created/verified`);
+
+            if (completed === totalQueries) {
+              console.log('✅ All database tables initialized successfully');
+              resolve();
+            }
+          });
+        });
+      });
+    });
+  });
+};
+
+// Initialize database on startup
+initializeDatabase()
+  .then(() => {
+    console.log('🚀 Database initialization completed');
+  })
+  .catch((err) => {
+    console.error('❌ Database initialization failed:', err);
+    process.exit(1);
+  });
 
 // ✅ GET all machines with components
 app.get('/api/machines', (req, res) => {

@@ -151,93 +151,94 @@ const MachineDetails: React.FC = () => {
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Left Half - Sensor Information */}
+                    {/* Left Side - Machine Information */}
                     <div className="space-y-6">
+                        {/* Machine Overview */}
                         <div className="bg-white rounded-lg shadow-md p-6">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-6">Sensor Overview</h3>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4">Machine Overview</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="text-sm text-gray-600">Machine Name</div>
+                                    <div className="text-lg font-semibold text-gray-900">{machineConfig.name}</div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-gray-600">Component Type</div>
+                                    <div className="text-lg font-semibold text-gray-900">{machineConfig.component}</div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-gray-600">Status</div>
+                                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(machineConfig.status)}`}>
+                                        {machineConfig.status.toUpperCase()}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                            {/* Temperature Sensor */}
-                            <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                                <div className="flex items-center space-x-3 mb-3">
-                                    <Thermometer className="w-6 h-6 text-orange-600" />
-                                    <h4 className="text-lg font-medium text-gray-900">Temperature</h4>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Current Reading</p>
-                                        <p className="text-2xl font-bold text-orange-600">
-                                            {machineConfig.sensors.temperature.current}{machineConfig.sensors.temperature.unit}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Maximum Range</p>
-                                        <p className="text-2xl font-bold text-gray-700">
-                                            {machineConfig.sensors.temperature.max}{machineConfig.sensors.temperature.unit}
-                                        </p>
+                        {/* Sensor Thresholds */}
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4">Sensor Thresholds</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center space-x-3">
+                                    <Thermometer className="w-5 h-5 text-orange-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Temperature Max</div>
+                                        <div className="text-lg font-semibold text-orange-600">{machineConfig.sensors.temperature.max}{machineConfig.sensors.temperature.unit}</div>
                                     </div>
                                 </div>
-                                <div className="mt-3">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div className="flex items-center space-x-3">
+                                    <Zap className="w-5 h-5 text-blue-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Vibration Max</div>
+                                        <div className="text-lg font-semibold text-blue-600">{machineConfig.sensors.vibration.max}{machineConfig.sensors.vibration.unit}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <Volume2 className="w-5 h-5 text-purple-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Noise Max</div>
+                                        <div className="text-lg font-semibold text-purple-600">{machineConfig.sensors.noise.max}{machineConfig.sensors.noise.unit}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Current Readings */}
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Readings</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center space-x-3">
+                                    <Thermometer className="w-5 h-5 text-orange-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Temperature</div>
+                                        <div className="text-lg font-semibold text-orange-600">{machineConfig.sensors.temperature.current}{machineConfig.sensors.temperature.unit}</div>
+                                    </div>
+                                    <div className="w-16 bg-gray-200 rounded-full h-2">
                                         <div
                                             className="bg-orange-600 h-2 rounded-full transition-all duration-500"
                                             style={{ width: `${(machineConfig.sensors.temperature.current / machineConfig.sensors.temperature.max) * 100}%` }}
                                         ></div>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Vibration Sensor */}
-                            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="flex items-center space-x-3 mb-3">
-                                    <Zap className="w-6 h-6 text-blue-600" />
-                                    <h4 className="text-lg font-medium text-gray-900">Vibration</h4>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Current Reading</p>
-                                        <p className="text-2xl font-bold text-blue-600">
-                                            {machineConfig.sensors.vibration.current}{machineConfig.sensors.vibration.unit}
-                                        </p>
+                                <div className="flex items-center space-x-3">
+                                    <Zap className="w-5 h-5 text-blue-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Vibration</div>
+                                        <div className="text-lg font-semibold text-blue-600">{machineConfig.sensors.vibration.current}{machineConfig.sensors.vibration.unit}</div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Maximum Range</p>
-                                        <p className="text-2xl font-bold text-gray-700">
-                                            {machineConfig.sensors.vibration.max}{machineConfig.sensors.vibration.unit}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="mt-3">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div className="w-16 bg-gray-200 rounded-full h-2">
                                         <div
                                             className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                                             style={{ width: `${(machineConfig.sensors.vibration.current / machineConfig.sensors.vibration.max) * 100}%` }}
                                         ></div>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Noise Sensor */}
-                            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                                <div className="flex items-center space-x-3 mb-3">
-                                    <Volume2 className="w-6 h-6 text-purple-600" />
-                                    <h4 className="text-lg font-medium text-gray-900">Noise Level</h4>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Current Reading</p>
-                                        <p className="text-2xl font-bold text-purple-600">
-                                            {machineConfig.sensors.noise.current}{machineConfig.sensors.noise.unit}
-                                        </p>
+                                <div className="flex items-center space-x-3">
+                                    <Volume2 className="w-5 h-5 text-purple-600" />
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-600">Noise Level</div>
+                                        <div className="text-lg font-semibold text-purple-600">{machineConfig.sensors.noise.current}{machineConfig.sensors.noise.unit}</div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Maximum Range</p>
-                                        <p className="text-2xl font-bold text-gray-700">
-                                            {machineConfig.sensors.noise.max}{machineConfig.sensors.noise.unit}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="mt-3">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div className="w-16 bg-gray-200 rounded-full h-2">
                                         <div
                                             className="bg-purple-600 h-2 rounded-full transition-all duration-500"
                                             style={{ width: `${(machineConfig.sensors.noise.current / machineConfig.sensors.noise.max) * 100}%` }}
@@ -248,33 +249,49 @@ const MachineDetails: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Right Half - Graphs */}
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-xl font-semibold text-gray-900 mb-6">Live Sensor Data</h3>
-
-                            {/* Temperature Graph */}
+                    {/* Right Side - Charts */}
+                    <div className="space-y-4">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4">Live Sensor Data</h3>
+                        
+                        {/* Temperature Graph */}
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center mb-3">
+                                <Thermometer className="w-5 h-5 text-orange-600 mr-2" />
+                                <span className="font-semibold text-orange-600">Temperature Trend</span>
+                            </div>
                             {renderWaveGraph(
                                 sensorData.temperature,
-                                'Temperature Monitoring',
+                                'Temperature',
                                 '#ea580c',
                                 '°C',
                                 machineConfig.sensors.temperature.max
                             )}
+                        </div>
 
-                            {/* Vibration Graph */}
+                        {/* Vibration Graph */}
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center mb-3">
+                                <Zap className="w-5 h-5 text-blue-600 mr-2" />
+                                <span className="font-semibold text-blue-600">Vibration Trend</span>
+                            </div>
                             {renderWaveGraph(
                                 sensorData.vibration,
-                                'Vibration Analysis',
+                                'Vibration',
                                 '#2563eb',
                                 'mm/s',
                                 machineConfig.sensors.vibration.max
                             )}
+                        </div>
 
-                            {/* Noise Graph */}
+                        {/* Noise Graph */}
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center mb-3">
+                                <Volume2 className="w-5 h-5 text-purple-600 mr-2" />
+                                <span className="font-semibold text-purple-600">Noise Level Trend</span>
+                            </div>
                             {renderWaveGraph(
                                 sensorData.noise,
-                                'Noise Level Monitoring',
+                                'Noise',
                                 '#7c3aed',
                                 'dB',
                                 machineConfig.sensors.noise.max
