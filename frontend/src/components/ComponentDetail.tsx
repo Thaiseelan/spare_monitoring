@@ -1,34 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Activity, AlertTriangle, Wrench, TrendingUp, Clock } from 'lucide-react';
-import { apiService, Component } from '../services/api';
-
-// Define local interfaces for the data we need
-interface SensorData {
-    id: number;
-    component_id: number;
-    vibration: number;
-    temperature: number;
-    noise: number;
-    timestamp: string;
-}
-
-interface Alert {
-    id: number;
-    component_id: number;
-    message: string;
-    level: string;
-    timestamp: string;
-}
-
-interface MaintenanceRecord {
-    id: number;
-    component_id: number;
-    description: string;
-    performed_by: string;
-    performed_at: string;
-    next_maintenance?: string;
-}
+import { apiService, Component, SensorData, Alert, MaintenanceRecord } from '../services/api';
 
 const ComponentDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -46,55 +19,85 @@ const ComponentDetail: React.FC = () => {
         }
     }, [id]);
 
+    // Replace mock data with actual API calls
     const fetchComponentData = async (componentId: number) => {
         try {
             setLoading(true);
-            const componentData = await apiService.getComponent(componentId);
+            const [componentData, sensorData, alerts, maintenance] = await Promise.all([
+                apiService.getComponent(componentId),
+                apiService.getSensorData(componentId),
+                apiService.getAlerts(componentId),
+                apiService.getMaintenanceRecords(componentId)
+            ]);
             
             setComponent(componentData);
-            
-            // For now, we'll use mock data since the API doesn't have these endpoints
-            // In a real implementation, these would be actual API calls
-            setSensorData([
-                {
-                    id: 1,
-                    component_id: componentId,
-                    vibration: 2.5,
-                    temperature: 45.2,
-                    noise: 68.3,
-                    timestamp: new Date().toISOString()
-                }
-            ]);
-            
-            setAlerts([
-                {
-                    id: 1,
-                    component_id: componentId,
-                    message: "Temperature approaching threshold",
-                    level: "warning",
-                    timestamp: new Date().toISOString()
-                }
-            ]);
-            
-            setMaintenanceRecords([
-                {
-                    id: 1,
-                    component_id: componentId,
-                    description: "Routine inspection completed",
-                    performed_by: "John Doe",
-                    performed_at: new Date().toISOString(),
-                    next_maintenance: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                }
-            ]);
-            
-            setError(null);
+            setSensorData(sensorData);
+            setAlerts(alerts);
+            setMaintenanceRecords(maintenance);
+            setLoading(false);
         } catch (err) {
-            console.error('Error fetching component data:', err);
             setError('Failed to load component data.');
-        } finally {
             setLoading(false);
         }
     };
+
+    // Add WebSocket connection for real-time updates
+    useEffect(() => {
+        if (!id) return;
+
+        // Set up polling for real-time updates (fallback if WebSocket not available)
+        const interval = setInterval(() => {
+            fetchComponentData(parseInt(id));
+        }, 5000); // Update every 5 seconds
+
+        // Try to establish WebSocket connection for real-time updates
+        let ws: WebSocket | null = null;
+        try {
+            ws = new WebSocket('ws://localhost:5000/sensor-data');
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected for real-time updates');
+                // Subscribe to component updates
+                ws?.send(JSON.stringify({ 
+                    type: 'subscribe', 
+                    componentId: parseInt(id) 
+                }));
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const newData = JSON.parse(event.data);
+                    if (newData.component_id === parseInt(id)) {
+                        // Update sensor data with new real-time data
+                        setSensorData(prev => {
+                            const updated = [...prev, newData];
+                            // Keep only last 50 data points
+                            return updated.slice(-50);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected, falling back to polling');
+            };
+        } catch (error) {
+            console.log('WebSocket not available, using polling only');
+        }
+
+        return () => {
+            clearInterval(interval);
+            if (ws) {
+                ws.close();
+            }
+        };
+    }, [id]);
 
     const getStatusColor = (status?: string) => {
         switch (status) {

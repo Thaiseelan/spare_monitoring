@@ -1,4 +1,3 @@
-// App.tsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
@@ -10,6 +9,7 @@ import ComponentDetail from './components/ComponentDetail';
 import AddComponent from './components/AddComponent';
 import MachineDetails from './components/MachineDetails';
 import SensorDetails from './components/SensorDetails';
+import SensorDashboard from "./components/SensorDashboard"; // ✅ keep this here
 
 const App = () => {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -40,7 +40,11 @@ const App = () => {
           path="/"
           element={
             <PrivateRoute>
-              <Dashboard onLogout={handleLogout} />
+              {/* ✅ Add SensorDashboard inside your Dashboard */}
+              <div>
+                <Dashboard onLogout={handleLogout} />
+                <SensorDashboard />  
+              </div>
             </PrivateRoute>
           }
         />
