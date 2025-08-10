@@ -4,16 +4,14 @@ const router = express.Router()
 console.log("Telegram Bot Token:", process.env.TELEGRAM_BOT_TOKEN ? "✅ Present" : "❌ Missing");
 console.log("First recipient chat_id:", process.env.TEST_CHAT_ID || "Not set");
 const mysql = require('mysql2');
-const TelegramBot = require("node-telegram-bot-api")
-const nodemailer = require("nodemailer")
-
-// Use the same database connection as app.js
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: 'localhost',
   user: 'root',
   password: 'root',
   database: 'smart_maintenance',
-});
+}).promise();
+const TelegramBot = require("node-telegram-bot-api")
+const nodemailer = require("nodemailer")
 
 // Initialize Telegram bot
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false })
@@ -56,6 +54,16 @@ router.post("/data", async (req, res) => {
       temperature,
       noise,
     ])
+
+    // Broadcast to WebSocket clients if broadcastSensorData function is available
+    if (typeof global.broadcastSensorData === 'function') {
+      global.broadcastSensorData(component_id, {
+        vibration,
+        temperature,
+        noise,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // Check thresholds and track alerts
     const alerts = []
@@ -524,28 +532,19 @@ setInterval(() => {
 }, 60000) // Check every minute
 
 // GET /api/sensors/data
+
+// GET /api/sensors/data
 router.get("/data", async (req, res) => {
-  console.log("Received sensor data:", req.body);
   try {
-    const { component_id } = req.query
-    let query = "SELECT * FROM sensor_data"
-    const params = []
-
-    if (component_id) {
-      query += " WHERE component_id = ?"
-      params.push(component_id)
-    }
-
-    query += " ORDER BY timestamp DESC LIMIT 100"
-
-    const rowsResult = await db.execute(query, params)
-    const rows = Array.isArray(rowsResult[0]) ? rowsResult[0] : rowsResult;
-    res.json(rows)
+    const { component_id } = req.query;
+    const query = "SELECT * FROM sensor_data WHERE component_id = ? ORDER BY timestamp DESC LIMIT 100";
+    const [rows] = await db.execute(query, [component_id]);
+    res.json(rows);
   } catch (error) {
-    console.error("DB error:", error)
-    res.status(500).json({ error: "Failed to fetch sensor data" })
+    console.error("DB error:", error);
+    res.status(500).json({ error: error.message });
   }
-})
+});
 
 // GET /api/sensors/alerts (existing endpoint)
 router.get("/alerts", async (req, res) => {
@@ -617,6 +616,47 @@ router.get("/limits/:component_id", (req, res) => {
     res.json(rows[0]);
   });
 });
+
+// PUT sensor limits for a component
+router.put("/limits/:component_id", (req, res) => {
+  const component_id = req.params.component_id;
+  const { temperature_max, vibration_max, noise_max } = req.body;
+
+  if (!temperature_max || !vibration_max || !noise_max) {
+    return res.status(400).json({ error: "Missing required fields: temperature_max, vibration_max, noise_max" });
+  }
+
+  // Check if limits exist for this component
+  const checkQuery = 'SELECT * FROM sensor_limits WHERE component_id = ?';
+  db.query(checkQuery, [component_id], (err, rows) => {
+    if (err) {
+      console.error("Sensor limits check error:", err);
+      return res.status(500).json({ error: "Failed to check sensor limits" });
+    }
+
+    if (rows.length > 0) {
+      // Update existing limits
+      const updateQuery = 'UPDATE sensor_limits SET temperature_max = ?, vibration_max = ?, noise_max = ? WHERE component_id = ?';
+      db.query(updateQuery, [temperature_max, vibration_max, noise_max, component_id], (err, result) => {
+        if (err) {
+          console.error("Sensor limits update error:", err);
+          return res.status(500).json({ error: "Failed to update sensor limits" });
+        }
+        res.json({ message: "Sensor limits updated successfully" });
+      });
+    } else {
+      // Insert new limits
+      const insertQuery = 'INSERT INTO sensor_limits (component_id, temperature_max, vibration_max, noise_max) VALUES (?, ?, ?, ?)';
+      db.query(insertQuery, [component_id, temperature_max, vibration_max, noise_max], (err, result) => {
+        if (err) {
+          console.error("Sensor limits insert error:", err);
+          return res.status(500).json({ error: "Failed to insert sensor limits" });
+        }
+        res.status(201).json({ message: "Sensor limits created successfully" });
+      });
+    }
+  });
+});
 router.post("/test-telegram", async (req, res) => {
   try {
     await bot.sendMessage(6571456440, "Test message from backend");
@@ -681,5 +721,35 @@ router.post("/test-maintenance", async (req, res) => {
     res.status(500).json({ error: "Failed to send test maintenance email" })
   }
 })
-  
+
+// GET /api/sensors/sensor-values/:component_id
+router.get("/sensor-values/:component_id", async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT * FROM sensor_data WHERE component_id = ? ORDER BY timestamp DESC LIMIT 100',
+      [req.params.component_id]
+    );
+    res.json(rows); // ✅ Only send rows, not the whole result object
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET latest reading from sensor_readings
+router.get("/latest-reading", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM sensor_data ORDER BY timestamp DESC LIMIT 1"
+    );
+    if (rows.length > 0) {
+      res.json(rows[0]);
+    } else {
+      res.status(404).json({ message: "No data found" });
+    }
+  } catch (err) {
+    console.error("Error fetching latest reading:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 module.exports = router

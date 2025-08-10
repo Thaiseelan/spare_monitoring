@@ -5,13 +5,90 @@ const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const WebSocket = require('ws');
 
 const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
 const PORT = 5000;
 
-// Middleware
-app.use(cors());
+// Middleware - MUST be at the top, before all routes
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
 app.use(bodyParser.json());
+app.use(express.json());
+
+// WebSocket connection management
+const clients = new Map(); // Map to store client connections by component
+
+wss.on('connection', (ws, req) => {
+  console.log('New WebSocket connection established');
+  
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      if (data.type === 'subscribe' && data.componentId) {
+        // Subscribe client to component updates
+        if (!clients.has(data.componentId)) {
+          clients.set(data.componentId, new Set());
+        }
+        clients.get(data.componentId).add(ws);
+        
+        console.log(`Client subscribed to component ${data.componentId}`);
+        
+        // Send confirmation
+        ws.send(JSON.stringify({
+          type: 'subscription_confirmed',
+          componentId: data.componentId
+        }));
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  });
+  
+  ws.on('close', () => {
+    // Remove client from all component subscriptions
+    clients.forEach((clientSet, componentId) => {
+      if (clientSet.has(ws)) {
+        clientSet.delete(ws);
+        if (clientSet.size === 0) {
+          clients.delete(componentId);
+        }
+      }
+    });
+    console.log('WebSocket connection closed');
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+});
+
+// Function to broadcast sensor data to subscribed clients
+const broadcastSensorData = (componentId, sensorData) => {
+  if (clients.has(componentId)) {
+    const message = JSON.stringify({
+      type: 'sensor_update',
+      component_id: componentId,
+      ...sensorData
+    });
+    
+    clients.get(componentId).forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  }
+};
+
+// Make broadcastSensorData globally available for routes
+global.broadcastSensorData = broadcastSensorData;
 
 // MySQL connection
 const db = mysql.createConnection({
@@ -150,15 +227,138 @@ const initializeDatabase = async () => {
   });
 };
 
-// Initialize database on startup
-initializeDatabase()
-  .then(() => {
-    console.log('🚀 Database initialization completed');
-  })
-  .catch((err) => {
-    console.error('❌ Database initialization failed:', err);
-    process.exit(1);
+// Add sample data function
+const addSampleData = async () => {
+  return new Promise((resolve, reject) => {
+    // Check if data already exists
+    db.query('SELECT COUNT(*) as count FROM machines', (err, results) => {
+      if (err) {
+        console.error('Error checking existing data:', err);
+        reject(err);
+        return;
+      }
+
+      if (results[0].count > 0) {
+        console.log('✅ Sample data already exists, skipping...');
+        resolve();
+        return;
+      }
+
+      console.log('📝 Adding sample data...');
+
+      // Insert sample machines
+      const machines = [
+        { name: 'CNC Machine 1' },
+        { name: 'Assembly Line A' },
+        { name: 'Packaging Unit B' }
+      ];
+
+      let machinesInserted = 0;
+      const machineIds = [];
+
+      machines.forEach((machine, index) => {
+        db.query('INSERT INTO machines (name) VALUES (?)', [machine.name], (err, result) => {
+          if (err) {
+            console.error('Error inserting machine:', err);
+            reject(err);
+            return;
+          }
+          machineIds.push(result.insertId);
+          machinesInserted++;
+
+          if (machinesInserted === machines.length) {
+            // Insert sample components
+            const components = [
+              { name: 'Ball Screw X-Axis', status: 'warning', machine_id: machineIds[0] },
+              { name: 'LM Guideway Y-Axis', status: 'good', machine_id: machineIds[0] },
+              { name: 'Tool Magazine', status: 'critical', machine_id: machineIds[0] },
+              { name: 'Conveyor Belt', status: 'good', machine_id: machineIds[1] },
+              { name: 'Robotic Arm', status: 'warning', machine_id: machineIds[1] },
+              { name: 'Sealing Unit', status: 'good', machine_id: machineIds[2] }
+            ];
+
+            let componentsInserted = 0;
+            const componentIds = [];
+
+            components.forEach((component, compIndex) => {
+              db.query(
+                'INSERT INTO components (name, status, machine_id) VALUES (?, ?, ?)',
+                [component.name, component.status, component.machine_id],
+                (err, result) => {
+                  if (err) {
+                    console.error('Error inserting component:', err);
+                    reject(err);
+                    return;
+                  }
+                  componentIds.push(result.insertId);
+                  componentsInserted++;
+
+                  if (componentsInserted === components.length) {
+                    // Insert sample sensor data
+                    const sensorData = [
+                      { component_id: componentIds[0], temperature: 75.2, vibration: 8.5, noise: 82.3 },
+                      { component_id: componentIds[0], temperature: 76.8, vibration: 9.1, noise: 84.1 },
+                      { component_id: componentIds[1], temperature: 65.5, vibration: 3.2, noise: 68.9 },
+                      { component_id: componentIds[1], temperature: 64.3, vibration: 2.8, noise: 67.2 },
+                      { component_id: componentIds[2], temperature: 95.7, vibration: 12.4, noise: 98.5 },
+                      { component_id: componentIds[2], temperature: 97.2, vibration: 13.1, noise: 99.8 }
+                    ];
+
+                    let sensorDataInserted = 0;
+                    sensorData.forEach((data, sensorIndex) => {
+                      db.query(
+                        'INSERT INTO sensor_data (component_id, temperature, vibration, noise) VALUES (?, ?, ?, ?)',
+                        [data.component_id, data.temperature, data.vibration, data.noise],
+                        (err) => {
+                          if (err) {
+                            console.error('Error inserting sensor data:', err);
+                            reject(err);
+                            return;
+                          }
+                          sensorDataInserted++;
+
+                          if (sensorDataInserted === sensorData.length) {
+                            // Insert sample sensor limits
+                            const sensorLimits = [
+                              { component_id: componentIds[0], temperature_max: 80, vibration_max: 5, noise_max: 85 },
+                              { component_id: componentIds[1], temperature_max: 80, vibration_max: 5, noise_max: 85 },
+                              { component_id: componentIds[2], temperature_max: 80, vibration_max: 5, noise_max: 85 }
+                            ];
+
+                            let limitsInserted = 0;
+                            sensorLimits.forEach((limits, limitIndex) => {
+                              db.query(
+                                'INSERT INTO sensor_limits (component_id, temperature_max, vibration_max, noise_max) VALUES (?, ?, ?, ?)',
+                                [limits.component_id, limits.temperature_max, limits.vibration_max, limits.noise_max],
+                                (err) => {
+                                  if (err) {
+                                    console.error('Error inserting sensor limits:', err);
+                                    reject(err);
+                                    return;
+                                  }
+                                  limitsInserted++;
+
+                                  if (limitsInserted === sensorLimits.length) {
+                                    console.log('✅ Sample data added successfully');
+                                    resolve();
+                                  }
+                                }
+                              );
+                            });
+                          }
+                        }
+                      );
+                    });
+                  }
+                }
+              );
+            });
+          }
+        });
+      });
+    });
   });
+};
 
 // ✅ GET all machines with components
 app.get('/api/machines', (req, res) => {
@@ -304,8 +504,17 @@ app.use('/api/sensors', sensorRoutes);
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
-
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}`);
+  
+  // Initialize database and add sample data
+  try {
+    await initializeDatabase();
+    await addSampleData();
+    console.log('✅ Database initialized with sample data');
+  } catch (error) {
+    console.error('❌ Database initialization failed:', error);
+  }
 });
