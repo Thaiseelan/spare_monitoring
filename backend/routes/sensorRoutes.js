@@ -34,7 +34,7 @@ const ALERT_CONFIG = {
   consecutiveThreshold: 3, // Number of consecutive alerts needed
   emailEscalationThreshold: 3, // Send email on 3rd alert
   timeWindowMinutes: 15, // Time window in minutes
-  cooldownMinutes: 0.05, // Cooldown period before sending another alert
+  cooldownMinutes: 0.5, // Cooldown period before sending another alert
 }
 
 // POST /api/sensors/data
@@ -730,7 +730,7 @@ router.get("/sensor-values/:component_id", async (req, res) => {
       [req.params.component_id]
     );
     res.json(rows); // ✅ Only send rows, not the whole result object
-  } catch (error) {
+  }catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -751,5 +751,61 @@ router.get("/latest-reading", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+// NEW: Process existing DB data for alerts
+async function processDBForAlerts() {
+  try {
+    // Get the latest 50 rows from sensor_data (adjust LIMIT as needed)
+    const [rows] = await db.execute(
+      "SELECT * FROM sensor_data ORDER BY timestamp ASC LIMIT 50"
+    );
+    
+    
+    for (const row of rows) {
+      const alerts = [];
+      const currentTime = new Date(row.timestamp);
+
+      if (row.vibration > 7.0) {
+        alerts.push({
+          type: "vibration",
+          message: "⚠️ High vibration",
+          value: row.vibration,
+          threshold: 8.0,
+        });
+      }
+
+      if (row.temperature > 75) {
+        alerts.push({
+          type: "temperature",
+          message: "🔥 High temperature",
+          value: row.temperature,
+          threshold: 80,
+        });
+      }
+
+      if (row.noise > 65) {
+        alerts.push({
+          type: "noise",
+          message: "🔊 High noise level",
+          value: row.noise,
+          threshold: 85,
+        });
+      }
+      for (const alert of alerts) {
+        await checkAndSendAlerts(row.component_id, alert, currentTime);
+    }
+
+      await new Promise(res => setTimeout(res, 30000)); // 30 sec
+}    console.log("✅ Finished processing DB data for alerts");
+  } catch (error) {
+    console.error("❌ Error processing DB data for alerts:", error);
+  }
+}
+
+// Trigger processing on server start
+processDBForAlerts();
+
+// Or run every 10 seconds to check for new rows
+setInterval(processDBForAlerts, 10000);
+
 
 module.exports = router

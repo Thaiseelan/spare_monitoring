@@ -12,6 +12,21 @@ const ComponentDetail: React.FC = () => {
     const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [lastMaintenance, setLastMaintenance] = useState('');
+    const [nextMaintenance, setNextMaintenance] = useState('');
+function formatDateForInput(dateStr: string) {
+  // If already in YYYY-MM-DD, just return it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+  // If in DD-MM-YYYY, convert to YYYY-MM-DD
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month}-${day}`;
+  }
+
+  return "";
+}
 
     useEffect(() => {
         if (id) {
@@ -123,6 +138,31 @@ const ComponentDetail: React.FC = () => {
         }
     };
 
+const handleAddComponent = () => {
+    // Check if both dates are provided
+    if (!lastMaintenance || !nextMaintenance) {
+        setError('Both Last Maintenance and Next Maintenance dates are required.');
+        return;
+    }
+
+    const lastDate = new Date(lastMaintenance);
+    const nextDate = new Date(nextMaintenance);
+
+    // Check if next maintenance date is before or equal to last maintenance date
+    if (nextDate <= lastDate) {
+        setError('Next Maintenance date must be after Last Maintenance date.');
+        return;
+    }
+
+    // Clear any previous errors
+    setError('');
+    
+    // TODO: Add your component creation logic here
+    console.log('Component can be created with valid dates');
+    // ...proceed to add component...
+};
+
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -208,22 +248,22 @@ const ComponentDetail: React.FC = () => {
                             Maintenance
                         </h2>
                         <div className="space-y-4">
-                            {component.last_maintenance && (
-                                <div>
-                                    <div className="text-sm text-gray-400">Last Maintenance</div>
-                                    <div className="text-lg font-semibold">
-                                        {new Date(component.last_maintenance).toLocaleDateString()}
-                                    </div>
+                            <div>
+                                <div className="text-sm text-gray-400">Last Maintenance</div>
+                                <div className="text-lg font-semibold">
+                                    {component.last_maintenance
+                                        ? new Date(component.last_maintenance).toLocaleDateString()
+                                        : 'N/A'}
                                 </div>
-                            )}
-                            {component.next_maintenance && (
-                                <div>
-                                    <div className="text-sm text-gray-400">Next Maintenance</div>
-                                    <div className="text-lg font-semibold">
-                                        {new Date(component.next_maintenance).toLocaleDateString()}
-                                    </div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-gray-400">Next Maintenance</div>
+                                <div className="text-lg font-semibold">
+                                    {component.next_maintenance
+                                        ? new Date(component.next_maintenance).toLocaleDateString()
+                                        : 'N/A'}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -355,6 +395,58 @@ const ComponentDetail: React.FC = () => {
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* Add Component Section - New Feature */}
+            <div className="bg-gray-900 rounded-lg p-6 mt-8">
+                <h2 className="text-xl font-semibold mb-4 text-blue-400 flex items-center">
+                    <Wrench className="w-5 h-5 mr-2" />
+                    Add Component
+                </h2>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Component Name</label>
+                        <input
+                            type="text"
+                            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            placeholder="Enter component name"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Status</label>
+                        <select className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="good">Good</option>
+                            <option value="warning">Warning</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Last Maintenance</label>
+                        <input
+                            type="date"
+                            value={lastMaintenance}
+                            onChange={(e) => setLastMaintenance(e.target.value)}
+                            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Next Maintenance</label>
+                        <input
+                            type="date"
+                            value={nextMaintenance}
+                            min={lastMaintenance ? formatDateForInput(lastMaintenance) : undefined}
+                            onChange={(e) => setNextMaintenance(e.target.value)}
+                            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                    </div>
+                    {error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
+                    <button
+                        onClick={handleAddComponent}
+                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                    >
+                        Add Component
+                    </button>
                 </div>
             </div>
         </div>
